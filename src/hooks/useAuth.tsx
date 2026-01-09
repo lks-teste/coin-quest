@@ -102,6 +102,22 @@ export function useAuth() {
     return { error };
   };
 
+  const resetPassword = async (email: string) => {
+    const redirectUrl = `${window.location.origin}/auth?type=recovery`;
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectUrl,
+    });
+    return { error };
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    return { error };
+  };
+
   const isAdmin = authState.role === 'admin';
   const isModerator = authState.role === 'moderator';
   const isStaff = isAdmin || isModerator;
@@ -111,6 +127,8 @@ export function useAuth() {
     signUp,
     signIn,
     signOut,
+    resetPassword,
+    updatePassword,
     isAdmin,
     isModerator,
     isStaff,
