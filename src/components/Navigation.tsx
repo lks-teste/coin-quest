@@ -1,19 +1,37 @@
-import { Link, useLocation } from 'react-router-dom';
-import { Home, Wallet, ShoppingBag, Ticket, Shield, Coins } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Home, Wallet, ShoppingBag, Ticket, Shield, Coins, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAppStore } from '@/lib/store';
-
-const navItems = [
-  { path: '/', icon: Home, label: 'Tasks' },
-  { path: '/wallet', icon: Wallet, label: 'Wallet' },
-  { path: '/shop', icon: ShoppingBag, label: 'Shop' },
-  { path: '/my-coupons', icon: Ticket, label: 'Coupons' },
-  { path: '/admin', icon: Shield, label: 'Admin' },
-];
+import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 export function Navigation() {
   const location = useLocation();
-  const balance = useAppStore((state) => state.balance);
+  const navigate = useNavigate();
+  const { isStaff, signOut } = useAuth();
+  const { balance } = useProfile();
+
+  const navItems = [
+    { path: '/', icon: Home, label: 'Tarefas' },
+    { path: '/wallet', icon: Wallet, label: 'Carteira' },
+    { path: '/shop', icon: ShoppingBag, label: 'Loja' },
+    { path: '/my-coupons', icon: Ticket, label: 'Cupons' },
+  ];
+
+  if (isStaff) {
+    navItems.push({ path: '/admin', icon: Shield, label: 'Admin' });
+  }
+
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast.error('Erro ao sair');
+    } else {
+      navigate('/auth');
+      toast.success('Até logo!');
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
@@ -43,9 +61,20 @@ export function Navigation() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-accent">
-          <Coins className="h-5 w-5 text-coin" />
-          <span className="font-bold text-accent-foreground">{balance}</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-accent">
+            <Coins className="h-5 w-5 text-coin" />
+            <span className="font-bold text-accent-foreground">{balance}</span>
+          </div>
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleSignOut}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <LogOut className="h-5 w-5" />
+          </Button>
         </div>
       </div>
       
