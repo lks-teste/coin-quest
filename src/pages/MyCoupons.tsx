@@ -1,10 +1,36 @@
 import { Ticket } from 'lucide-react';
+import { useAppStore } from '@/lib/store';
 import { Navigation } from '@/components/Navigation';
 import { CouponCard } from '@/components/CouponCard';
-import { useCoupons } from '@/hooks/useCoupons';
+import { toast } from 'sonner';
 
 export default function MyCouponsPage() {
-  const { userCoupons, loading } = useCoupons();
+  const { userCoupons, requestRedemption, redemptionRequests } = useAppStore();
+
+  const handleRedeem = (couponId: string) => {
+    const userCoupon = userCoupons.find(c => c.id === couponId);
+    if (!userCoupon) return;
+    
+    const existingRequest = redemptionRequests.find(
+      r => r.coupon_hash === userCoupon.hash && r.status === 'pending'
+    );
+    
+    if (existingRequest) {
+      toast.info('Redemption already requested');
+      return;
+    }
+    
+    requestRedemption(userCoupon);
+    toast.success('Redemption requested! Awaiting admin approval.', {
+      icon: '📋',
+    });
+  };
+
+  const hasPendingRequest = (hash: string) => {
+    return redemptionRequests.some(
+      r => r.coupon_hash === hash && r.status === 'pending'
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -14,23 +40,19 @@ export default function MyCouponsPage() {
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-2">
             <Ticket className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-bold">Meus Cupons</h1>
+            <h1 className="text-3xl font-bold">My Coupons</h1>
           </div>
           <p className="text-muted-foreground">
-            Seus cupons comprados e o código para usar na loja
+            Your purchased coupons and their redemption status
           </p>
         </div>
         
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-          </div>
-        ) : userCoupons.length === 0 ? (
+        {userCoupons.length === 0 ? (
           <div className="text-center py-16">
             <Ticket className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Nenhum cupom ainda</h2>
+            <h2 className="text-xl font-semibold mb-2">No coupons yet</h2>
             <p className="text-muted-foreground">
-              Visite a loja para comprar cupons com suas moedas!
+              Visit the shop to purchase coupons with your coins!
             </p>
           </div>
         ) : (
@@ -38,11 +60,12 @@ export default function MyCouponsPage() {
             {userCoupons.map((userCoupon) => (
               <CouponCard
                 key={userCoupon.id}
-                coupon={userCoupon.coupon!}
+                coupon={userCoupon.coupon}
                 variant="owned"
-                code={userCoupon.code}
-                purchasedAt={userCoupon.purchased_at}
-                isUsed={userCoupon.is_used}
+                hash={userCoupon.hash}
+                expiresAt={userCoupon.expires_at}
+                isRedeemed={userCoupon.redeemed || hasPendingRequest(userCoupon.hash)}
+                onRedeem={() => handleRedeem(userCoupon.id)}
               />
             ))}
           </div>

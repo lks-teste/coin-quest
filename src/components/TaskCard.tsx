@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CheckCircle2, Clock, Upload, Camera, AlertCircle } from 'lucide-react';
+import { Task, useAppStore } from '@/lib/store';
 import { CoinDisplay } from './CoinDisplay';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,17 +14,6 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { useTasks } from '@/hooks/useTasks';
-
-interface Task {
-  id: string;
-  title: string;
-  description: string | null;
-  coins: number;
-  icon: string | null;
-  cooldown_hours: number | null;
-  created_at: string;
-}
 
 interface TaskCardProps {
   task: Task;
@@ -32,7 +22,7 @@ interface TaskCardProps {
 export function TaskCard({ task }: TaskCardProps) {
   const [showProofDialog, setShowProofDialog] = useState(false);
   const [proofUploaded, setProofUploaded] = useState(false);
-  const { completeTask, canCompleteTask, getLastCompletion } = useTasks();
+  const { completeTask, canCompleteTask, getLastCompletion } = useAppStore();
   
   const canComplete = canCompleteTask(task);
   const lastCompletion = getLastCompletion(task.id);
@@ -40,27 +30,30 @@ export function TaskCard({ task }: TaskCardProps) {
 
   const handleComplete = () => {
     if (!canComplete) return;
-    setShowProofDialog(true);
-  };
-
-  const handleSubmitProof = async () => {
-    const { error } = await completeTask(task.id);
-    setShowProofDialog(false);
-    setProofUploaded(false);
     
-    if (error) {
-      toast.error('Erro ao completar tarefa');
+    if (task.verification_required) {
+      setShowProofDialog(true);
     } else {
-      toast.success('Prova enviada! Aguardando aprovação.', {
-        icon: '📤',
+      completeTask(task);
+      toast.success(`Task completed! +${task.reward_coins} coins`, {
+        icon: '🎉',
       });
     }
+  };
+
+  const handleSubmitProof = () => {
+    completeTask(task, proofUploaded ? 'proof_uploaded' : undefined);
+    setShowProofDialog(false);
+    setProofUploaded(false);
+    toast.success('Proof submitted! Awaiting approval.', {
+      icon: '📤',
+    });
   };
 
   const getTimeRemaining = () => {
     if (!lastCompletion || canComplete) return null;
     
-    const cooldownMs = (task.cooldown_hours ?? 24) * 60 * 60 * 1000;
+    const cooldownMs = task.cooldown_hours * 60 * 60 * 1000;
     const completedAt = new Date(lastCompletion.created_at).getTime();
     const availableAt = completedAt + cooldownMs;
     const remaining = availableAt - Date.now();
@@ -82,7 +75,7 @@ export function TaskCard({ task }: TaskCardProps) {
         <CardContent className="p-0">
           <div className="flex items-stretch">
             <div className="flex items-center justify-center w-20 bg-accent text-4xl">
-              {task.icon || '⭐'}
+              {task.icon}
             </div>
             
             <div className="flex-1 p-4">
@@ -92,16 +85,20 @@ export function TaskCard({ task }: TaskCardProps) {
                   <p className="text-sm text-muted-foreground mt-0.5">{task.description}</p>
                   
                   <div className="flex items-center gap-3 mt-3">
-                    <CoinDisplay amount={task.coins} size="sm" />
+                    <CoinDisplay amount={task.reward_coins} size="sm" />
                     
-                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
-                      <Camera className="h-3 w-3" />
-                      Prova necessária
-                    </span>
+                    {task.verification_required && (
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                        <Camera className="h-3 w-3" />
+                        Proof required
+                      </span>
+                    )}
                     
-                    <span className="text-xs text-muted-foreground">
-                      Diária
-                    </span>
+                    {task.type === 'recurring' && (
+                      <span className="text-xs text-muted-foreground">
+                        Daily
+                      </span>
+                    )}
                   </div>
                 </div>
                 
@@ -109,7 +106,7 @@ export function TaskCard({ task }: TaskCardProps) {
                   {isPending ? (
                     <div className="flex items-center gap-1.5 text-sm text-warning bg-warning/10 px-3 py-1.5 rounded-lg">
                       <Clock className="h-4 w-4" />
-                      <span>Pendente</span>
+                      <span>Pending</span>
                     </div>
                   ) : canComplete ? (
                     <Button
@@ -117,7 +114,7 @@ export function TaskCard({ task }: TaskCardProps) {
                       className="gradient-gold text-primary-foreground hover:opacity-90 transition-opacity"
                     >
                       <CheckCircle2 className="h-4 w-4 mr-1.5" />
-                      Completar
+                      Complete
                     </Button>
                   ) : (
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -135,9 +132,9 @@ export function TaskCard({ task }: TaskCardProps) {
       <Dialog open={showProofDialog} onOpenChange={setShowProofDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Enviar Prova</DialogTitle>
+            <DialogTitle>Submit Proof</DialogTitle>
             <DialogDescription>
-              Envie uma foto ou screenshot para verificar que você completou esta tarefa.
+              Upload a photo or screenshot to verify you completed this task.
             </DialogDescription>
           </DialogHeader>
           
@@ -154,32 +151,32 @@ export function TaskCard({ task }: TaskCardProps) {
               {proofUploaded ? (
                 <div className="flex flex-col items-center gap-2 text-success">
                   <CheckCircle2 className="h-12 w-12" />
-                  <span className="font-medium">Prova enviada</span>
+                  <span className="font-medium">Proof uploaded</span>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2 text-muted-foreground">
                   <Upload className="h-12 w-12" />
-                  <span>Clique para enviar prova</span>
-                  <span className="text-xs">(Demo: clique para simular upload)</span>
+                  <span>Click to upload proof</span>
+                  <span className="text-xs">(Demo: click to simulate upload)</span>
                 </div>
               )}
             </div>
             
             <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted p-3 rounded-lg">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-              <p>Sua submissão será revisada por um administrador. As moedas serão creditadas após aprovação.</p>
+              <p>Your submission will be reviewed by an admin. Coins will be awarded upon approval.</p>
             </div>
           </div>
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowProofDialog(false)}>
-              Cancelar
+              Cancel
             </Button>
             <Button 
               onClick={handleSubmitProof}
               className="gradient-gold text-primary-foreground"
             >
-              Enviar Prova
+              Submit Proof
             </Button>
           </DialogFooter>
         </DialogContent>

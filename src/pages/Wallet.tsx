@@ -1,18 +1,28 @@
 import { ArrowDownLeft, ArrowUpRight, Coins, TrendingUp } from 'lucide-react';
+import { useAppStore } from '@/lib/store';
 import { Navigation } from '@/components/Navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { useProfile } from '@/hooks/useProfile';
-import { useTransactions } from '@/hooks/useTransactions';
 
 export default function WalletPage() {
-  const { balance } = useProfile();
-  const { transactions, totalEarned, totalSpent, loading } = useTransactions();
+  const { balance, transactions } = useAppStore();
+
+  const totalEarned = transactions
+    .filter(t => t.type === 'earn')
+    .reduce((sum, t) => sum + t.change, 0);
+  
+  const totalSpent = transactions
+    .filter(t => t.type === 'spend')
+    .reduce((sum, t) => sum + Math.abs(t.change), 0);
+
+  const sortedTransactions = [...transactions].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('pt-BR', {
-      day: 'numeric',
+    return new Date(date).toLocaleDateString('en-US', {
       month: 'short',
+      day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -24,8 +34,8 @@ export default function WalletPage() {
       
       <main className="container py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Carteira</h1>
-          <p className="text-muted-foreground">Acompanhe seus ganhos e gastos</p>
+          <h1 className="text-3xl font-bold mb-2">Wallet</h1>
+          <p className="text-muted-foreground">Track your earnings and spending</p>
         </div>
         
         {/* Balance Card */}
@@ -33,7 +43,7 @@ export default function WalletPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between text-primary-foreground">
               <div>
-                <p className="text-sm opacity-90">Saldo Atual</p>
+                <p className="text-sm opacity-90">Current Balance</p>
                 <div className="flex items-center gap-3 mt-1">
                   <Coins className="h-10 w-10" />
                   <span className="text-5xl font-bold">{balance}</span>
@@ -55,7 +65,7 @@ export default function WalletPage() {
                   <TrendingUp className="h-5 w-5 text-success" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Ganho</p>
+                  <p className="text-sm text-muted-foreground">Total Earned</p>
                   <p className="text-xl font-bold text-success">+{totalEarned}</p>
                 </div>
               </div>
@@ -69,7 +79,7 @@ export default function WalletPage() {
                   <ArrowUpRight className="h-5 w-5 text-destructive" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Gasto</p>
+                  <p className="text-sm text-muted-foreground">Total Spent</p>
                   <p className="text-xl font-bold text-destructive">-{totalSpent}</p>
                 </div>
               </div>
@@ -80,20 +90,16 @@ export default function WalletPage() {
         {/* Transaction History */}
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle>Histórico de Transações</CardTitle>
+            <CardTitle>Transaction History</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-              </div>
-            ) : transactions.length === 0 ? (
+            {sortedTransactions.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                Nenhuma transação ainda. Complete tarefas para ganhar moedas!
+                No transactions yet. Complete tasks to earn coins!
               </p>
             ) : (
               <div className="space-y-3">
-                {transactions.map((transaction) => (
+                {sortedTransactions.map((transaction) => (
                   <div 
                     key={transaction.id}
                     className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
@@ -101,11 +107,11 @@ export default function WalletPage() {
                     <div className="flex items-center gap-3">
                       <div className={cn(
                         'h-8 w-8 rounded-full flex items-center justify-center',
-                        transaction.amount > 0 
+                        transaction.type === 'earn' 
                           ? 'bg-success/10 text-success'
                           : 'bg-destructive/10 text-destructive'
                       )}>
-                        {transaction.amount > 0 
+                        {transaction.type === 'earn' 
                           ? <ArrowDownLeft className="h-4 w-4" />
                           : <ArrowUpRight className="h-4 w-4" />
                         }
@@ -119,9 +125,9 @@ export default function WalletPage() {
                     </div>
                     <span className={cn(
                       'font-bold',
-                      transaction.amount > 0 ? 'text-success' : 'text-destructive'
+                      transaction.change > 0 ? 'text-success' : 'text-destructive'
                     )}>
-                      {transaction.amount > 0 ? '+' : ''}{transaction.amount}
+                      {transaction.change > 0 ? '+' : ''}{transaction.change}
                     </span>
                   </div>
                 ))}
