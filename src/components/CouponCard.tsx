@@ -1,49 +1,61 @@
 import { ShoppingCart, Check, Clock } from 'lucide-react';
-import { Coupon, useAppStore } from '@/lib/store';
 import { CoinDisplay } from './CoinDisplay';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useCoupons } from '@/hooks/useCoupons';
+import { useProfile } from '@/hooks/useProfile';
+
+interface Coupon {
+  id: string;
+  title: string;
+  description: string | null;
+  cost: number;
+  discount: string | null;
+}
 
 interface CouponCardProps {
   coupon: Coupon;
   variant?: 'shop' | 'owned';
   onRedeem?: () => void;
-  isRedeemed?: boolean;
-  hash?: string;
-  expiresAt?: string;
+  isUsed?: boolean;
+  code?: string;
+  purchasedAt?: string;
 }
 
 export function CouponCard({ 
   coupon, 
   variant = 'shop',
   onRedeem,
-  isRedeemed = false,
-  hash,
-  expiresAt
+  isUsed = false,
+  code,
+  purchasedAt
 }: CouponCardProps) {
-  const { balance, purchaseCoupon } = useAppStore();
-  const canAfford = balance >= coupon.cost_coins;
+  const { purchaseCoupon } = useCoupons();
+  const { balance } = useProfile();
+  const canAfford = balance >= coupon.cost;
 
-  const handlePurchase = () => {
+  const handlePurchase = async () => {
     if (!canAfford) {
-      toast.error('Not enough coins!');
+      toast.error('Moedas insuficientes!');
       return;
     }
     
-    const userCoupon = purchaseCoupon(coupon);
-    if (userCoupon) {
-      toast.success(`Coupon purchased! Check "My Coupons"`, {
+    const { error } = await purchaseCoupon(coupon.id);
+    if (error) {
+      toast.error('Erro ao comprar cupom');
+    } else {
+      toast.success(`Cupom comprado! Veja em "Meus Cupons"`, {
         icon: '🎟️',
       });
     }
   };
 
-  const formatExpiry = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('pt-BR', {
       day: 'numeric',
+      month: 'short',
       year: 'numeric',
     });
   };
@@ -51,21 +63,21 @@ export function CouponCard({
   return (
     <Card className={cn(
       'shadow-card hover:shadow-card-hover transition-all duration-300 overflow-hidden',
-      isRedeemed && 'opacity-60'
+      isUsed && 'opacity-60'
     )}>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-sm text-muted-foreground">{coupon.merchant}</p>
-            <h3 className="text-2xl font-bold text-foreground">{coupon.value}</h3>
+            <p className="text-sm text-muted-foreground">{coupon.title}</p>
+            <h3 className="text-2xl font-bold text-foreground">{coupon.discount}</h3>
           </div>
           {variant === 'shop' && (
-            <CoinDisplay amount={coupon.cost_coins} size="md" />
+            <CoinDisplay amount={coupon.cost} size="md" />
           )}
-          {variant === 'owned' && isRedeemed && (
+          {variant === 'owned' && isUsed && (
             <div className="flex items-center gap-1 text-sm text-success bg-success/10 px-2 py-1 rounded-full">
               <Check className="h-4 w-4" />
-              Redeemed
+              Usado
             </div>
           )}
         </div>
@@ -74,17 +86,17 @@ export function CouponCard({
       <CardContent>
         <p className="text-sm text-muted-foreground">{coupon.description}</p>
         
-        {variant === 'owned' && hash && (
+        {variant === 'owned' && code && (
           <div className="mt-4 p-3 bg-muted rounded-lg">
-            <p className="text-xs text-muted-foreground mb-1">Coupon Code</p>
-            <p className="font-mono text-sm font-bold tracking-wider">{hash}</p>
+            <p className="text-xs text-muted-foreground mb-1">Código do Cupom</p>
+            <p className="font-mono text-sm font-bold tracking-wider">{code}</p>
           </div>
         )}
         
-        {variant === 'owned' && expiresAt && (
+        {variant === 'owned' && purchasedAt && (
           <div className="flex items-center gap-1.5 mt-3 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
-            <span>Expires {formatExpiry(expiresAt)}</span>
+            <span>Comprado em {formatDate(purchasedAt)}</span>
           </div>
         )}
       </CardContent>
@@ -102,19 +114,19 @@ export function CouponCard({
             )}
           >
             <ShoppingCart className="h-4 w-4 mr-2" />
-            {canAfford ? 'Purchase' : 'Not enough coins'}
+            {canAfford ? 'Comprar' : 'Moedas insuficientes'}
           </Button>
         ) : (
           <Button
             onClick={onRedeem}
-            disabled={isRedeemed}
-            variant={isRedeemed ? 'outline' : 'default'}
+            disabled={isUsed}
+            variant={isUsed ? 'outline' : 'default'}
             className={cn(
               'w-full',
-              !isRedeemed && 'gradient-success text-success-foreground hover:opacity-90'
+              !isUsed && 'gradient-success text-success-foreground hover:opacity-90'
             )}
           >
-            {isRedeemed ? 'Already Redeemed' : 'Request Redemption'}
+            {isUsed ? 'Já Utilizado' : 'Mostrar para usar'}
           </Button>
         )}
       </CardFooter>
